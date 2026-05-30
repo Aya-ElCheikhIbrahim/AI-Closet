@@ -9,13 +9,17 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
-        Schema::create('tags', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
-    }
+   public function up(): void
+{
+    Schema::create('tags', function (Blueprint $table) {
+        $table->string('id')->primary();
+
+        $table->string('name');
+        $table->string('userId');
+
+        $table->foreign('userId')->references('id')->on('users')->cascadeOnDelete();
+    });
+}
 
     /**
      * Reverse the migrations.

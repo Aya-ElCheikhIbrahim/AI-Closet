@@ -9,25 +9,19 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+   public function up(): void
 {
-    Schema::create('clothing_items', function (Blueprint $table) {
+    Schema::create('outfits', function (Blueprint $table) {
         $table->string('id')->primary();
 
         $table->string('userId');
         $table->string('name');
-        $table->string('category');
-        $table->string('subcategory')->nullable();
-        $table->string('color')->nullable();
-        $table->string('secondaryColor')->nullable();
-        $table->string('season')->nullable();
+        $table->string('style')->nullable();
         $table->string('occasion')->nullable();
-        $table->string('brand')->nullable();
-        $table->text('notes')->nullable();
+        $table->string('season')->nullable();
+        $table->string('outfitHash')->nullable();
 
-        $table->string('imageOriginal')->nullable();
-        $table->string('imageNoBg')->nullable();
-
+        $table->boolean('aiGenerated')->default(false);
         $table->boolean('favorite')->default(false);
         $table->integer('wearCount')->default(0);
         $table->timestamp('lastWornAt')->nullable();
@@ -42,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('clothing_items');
+        Schema::dropIfExists('outfits');
     }
 };

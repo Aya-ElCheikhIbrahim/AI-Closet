@@ -10,18 +10,19 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-    {
-        Schema::create('outfit_items', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
-        });
-    }
-
+{
+    Schema::create('users', function (Blueprint $table) {
+        $table->string('id')->primary();
+        $table->string('username');
+        $table->string('email')->unique();
+        $table->timestamp('createdAt')->useCurrent();
+    });
+}
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('outfit_items');
+        Schema::dropIfExists('users');
     }
 };
