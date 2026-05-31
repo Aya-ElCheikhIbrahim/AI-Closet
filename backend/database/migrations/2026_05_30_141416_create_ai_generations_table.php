@@ -12,9 +12,9 @@ return new class extends Migration
   public function up(): void
 {
     Schema::create('ai_generations', function (Blueprint $table) {
-        $table->string('id')->primary();
+        $table->id();
 
-        $table->string('outfitId');
+        $table->unsignedBigInteger('outfitId');
         $table->text('prompt');
         $table->string('modelUsed')->nullable();
         $table->string('generatedImagePath')->nullable();

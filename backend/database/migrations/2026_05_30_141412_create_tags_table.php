@@ -12,10 +12,10 @@ return new class extends Migration
    public function up(): void
 {
     Schema::create('tags', function (Blueprint $table) {
-        $table->string('id')->primary();
+        $table->id();
 
         $table->string('name');
-        $table->string('userId');
+        $table->unsignedBigInteger('userId');
 
         $table->foreign('userId')->references('id')->on('users')->cascadeOnDelete();
     });

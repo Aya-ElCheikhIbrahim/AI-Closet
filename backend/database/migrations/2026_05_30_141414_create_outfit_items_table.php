@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
 {
     Schema::create('outfit_items', function (Blueprint $table) {
-        $table->string('id')->primary();
+        $table->id();
 
-        $table->string('outfitId');
-        $table->string('clothingItemId');
+        $table->unsignedBigInteger('outfitId');
+        $table->unsignedBigInteger('clothingItemId');
         $table->integer('position')->default(0);
 
         $table->foreign('outfitId')->references('id')->on('outfits')->cascadeOnDelete();

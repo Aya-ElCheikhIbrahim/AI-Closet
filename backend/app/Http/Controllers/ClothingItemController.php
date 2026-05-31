@@ -15,6 +15,7 @@ class ClothingItemController extends Controller
     {
         try {
             $user_id = auth()->id();
+
             $items = ClothingItemService::getAllClothingItems($user_id, $id);
 
             return $this->responseJSON($items, "Clothing items fetched successfully.");

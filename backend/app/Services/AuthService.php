@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class AuthService
 {
@@ -19,7 +18,6 @@ class AuthService
         ]);
 
         $user = User::create([
-            'id' => Str::uuid()->toString(),
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -37,11 +35,12 @@ class AuthService
             'password' => 'required|string',
         ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return null;
         }
 
-        $user = Auth::user();
         $user->token = $user->createToken('auth_token')->plainTextToken;
 
         return $user;

@@ -33,7 +33,7 @@ class AuthController extends Controller
 
             return $this->responseJSON($user, "Logged in successfully.");
         } catch (Exception $e) {
-            return $this->responseJSON(null, "Login failed.", 500);
+            return $this->responseJSON(null, $e->getMessage(), 500);
         }
     }
 

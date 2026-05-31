@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
 {
     Schema::create('clothing_items', function (Blueprint $table) {
-        $table->string('id')->primary();
+        $table->id();
 
-        $table->string('userId');
+        $table->unsignedBigInteger('userId');
         $table->string('name');
         $table->string('category');
         $table->string('subcategory')->nullable();
