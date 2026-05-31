@@ -2,47 +2,57 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\OutfitService;
+use App\Traits\ResponseTrait;
+use Exception;
 use Illuminate\Http\Request;
 
 class OutfitController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    use ResponseTrait;
+
+    public function getAllOutfits($id = null)
     {
-        //
+        try {
+            $user_id = auth()->id();
+            $outfits = OutfitService::getAllOutfits($user_id, $id);
+
+            return $this->responseJSON($outfits, "Outfits fetched successfully.");
+        } catch (Exception $e) {
+            return $this->responseJSON(null, $e->getMessage(), 500);
+        }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    public function createOutfit(Request $request)
     {
-        //
+        try {
+            $outfit = OutfitService::createOutfit($request);
+
+            return $this->responseJSON($outfit, "Outfit created successfully.");
+        } catch (Exception $e) {
+            return $this->responseJSON(null, $e->getMessage(), 500);
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function updateOutfit(Request $request, $id)
     {
-        //
+        try {
+            $outfit = OutfitService::updateOutfit($request, $id);
+
+            return $this->responseJSON($outfit, "Outfit updated successfully.");
+        } catch (Exception $e) {
+            return $this->responseJSON(null, $e->getMessage(), 500);
+        }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function deleteOutfit($id)
     {
-        //
-    }
+        try {
+            OutfitService::deleteOutfit($id);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+            return $this->responseJSON(null, "Outfit deleted successfully.");
+        } catch (Exception $e) {
+            return $this->responseJSON(null, $e->getMessage(), 500);
+        }
     }
 }
