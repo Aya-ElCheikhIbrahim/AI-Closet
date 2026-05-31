@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Outfit;
 use App\Services\OutfitService;
 use App\Traits\ResponseTrait;
 use Exception;
@@ -14,8 +15,9 @@ class OutfitController extends Controller
     public function getAllOutfits($id = null)
     {
         try {
-            $user_id = auth()->id();
-            $outfits = OutfitService::getAllOutfits($user_id, $id);
+            $userId = auth()->id();
+
+            $outfits = OutfitService::getAllOutfits($userId, $id);
 
             return $this->responseJSON($outfits, "Outfits fetched successfully.");
         } catch (Exception $e) {
@@ -23,25 +25,34 @@ class OutfitController extends Controller
         }
     }
 
-    public function createOutfit(Request $request)
+    public function createOrUpdateOutfit(Request $request, $id = null)
     {
         try {
-            $outfit = OutfitService::createOutfit($request);
+            $outfit = new Outfit;
 
-            return $this->responseJSON($outfit, "Outfit created successfully.");
+            if ($id) {
+                $outfit = OutfitService::getAllOutfits(auth()->id(), $id);
+
+                if (!$outfit) {
+                    return $this->responseJSON(null, "Outfit not found.", 404);
+                }
+            }
+
+            $data = $request->all();
+
+            if (!$id) {
+                $data['userId'] = auth()->id();
+            }
+
+            $outfit = OutfitService::createOrUpdateOutfit($data, $outfit);
+
+            if ($outfit) {
+                return $this->responseJSON($outfit, "Outfit saved successfully.");
+            }
+
+            return $this->responseJSON(null, "Failed to save outfit.", 400);
         } catch (Exception $e) {
-            return $this->responseJSON(null, $e->getMessage(), 500);
-        }
-    }
-
-    public function updateOutfit(Request $request, $id)
-    {
-        try {
-            $outfit = OutfitService::updateOutfit($request, $id);
-
-            return $this->responseJSON($outfit, "Outfit updated successfully.");
-        } catch (Exception $e) {
-            return $this->responseJSON(null, $e->getMessage(), 500);
+            return $this->responseJSON(null, "Server error while saving outfit.", 500);
         }
     }
 
