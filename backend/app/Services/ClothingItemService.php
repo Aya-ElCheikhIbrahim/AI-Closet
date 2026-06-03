@@ -19,82 +19,127 @@ class ClothingItemService
             ->first();
     }
 
-    public static function createOrUpdateClothingItem($data, $item)
-{
-    set_time_limit(300);
+    private static function parsePythonJson($output)
+    {
+        $lines = explode("\n", trim($output));
 
-    $item->userId = $data['userId'] ?? $item->userId;
-    $item->name = $data['name'] ?? $item->name;
-    $item->category = $data['category'] ?? $item->category;
-    $item->subcategory = $data['subcategory'] ?? $item->subcategory;
-    $item->color = $data['color'] ?? $item->color;
-    $item->secondaryColor = $data['secondaryColor'] ?? $item->secondaryColor;
-    $item->season = $data['season'] ?? $item->season;
-    $item->occasion = $data['occasion'] ?? $item->occasion;
-    $item->brand = $data['brand'] ?? $item->brand;
-    $item->notes = $data['notes'] ?? $item->notes;
-    $item->favorite = $data['favorite'] ?? $item->favorite ?? false;
-    $item->wearCount = $data['wearCount'] ?? $item->wearCount ?? 0;
-    $item->lastWornAt = $data['lastWornAt'] ?? $item->lastWornAt;
+        foreach (array_reverse($lines) as $line) {
+            $line = trim($line);
 
-    if (isset($data['base64']) && isset($data['file_name'])) {
-        $base64String = $data['base64'];
-
-        if (Str::contains($base64String, ';base64,')) {
-            [$meta, $base64String] = explode(';base64,', $base64String);
+            if (str_starts_with($line, '{')) {
+                return json_decode($line, true);
+            }
         }
 
-        $decoded = base64_decode($base64String);
-
-        $filename = uniqid() . '_' . preg_replace('/\s+/', '_', $data['file_name']);
-        $folder = 'clothing_items/originals';
-        $fullPath = $folder . '/' . $filename;
-
-        Storage::disk('public')->put($fullPath, $decoded);
-
-        $item->imageOriginal = $fullPath;
+        return null;
     }
 
-    $item->save();
+    public static function createOrUpdateClothingItem($data, $item)
+    {
+        set_time_limit(300);
 
-    if (isset($fullPath)) {
-        $inputPath = storage_path('app/public/' . $fullPath);
-        $outputPath = storage_path('app/public/clothing_items/processed');
+        $item->userId = $data['userId'] ?? $item->userId;
+        $item->name = $data['name'] ?? $item->name;
+        $item->category = $data['category'] ?? $item->category ?? 'uncategorized';
+        $item->subcategory = $data['subcategory'] ?? $item->subcategory;
+        $item->color = $data['color'] ?? $item->color;
+        $item->secondaryColor = $data['secondaryColor'] ?? $item->secondaryColor;
+        $item->season = $data['season'] ?? $item->season;
+        $item->occasion = $data['occasion'] ?? $item->occasion;
+        $item->brand = $data['brand'] ?? $item->brand;
+        $item->notes = $data['notes'] ?? $item->notes;
+        $item->favorite = $data['favorite'] ?? $item->favorite ?? false;
+        $item->wearCount = $data['wearCount'] ?? $item->wearCount ?? 0;
+        $item->lastWornAt = $data['lastWornAt'] ?? $item->lastWornAt;
 
-        $python = base_path('venv/bin/python');
-        $script = base_path('python_scripts/bg_remover.py');
+        if (isset($data['base64']) && isset($data['file_name'])) {
+            $base64String = $data['base64'];
 
-        $command = escapeshellcmd($python) . ' ' .
-            escapeshellarg($script) . ' --file ' .
-            escapeshellarg($inputPath) . ' --output ' .
-            escapeshellarg($outputPath);
+            if (Str::contains($base64String, ';base64,')) {
+                [$meta, $base64String] = explode(';base64,', $base64String);
+            }
 
-        $output = shell_exec($command);
+            $decoded = base64_decode($base64String);
 
-        $result = json_decode($output, true);
+            $filename = uniqid() . '_' . preg_replace('/\s+/', '_', $data['file_name']);
+            $folder = 'clothing_items/originals';
+            $fullPath = $folder . '/' . $filename;
 
-        if ($result && isset($result['success']) && $result['success']) {
+            Storage::disk('public')->put($fullPath, $decoded);
+
+            $item->imageOriginal = $fullPath;
+        }
+
+        $item->save();
+
+        if (isset($fullPath)) {
+            $inputPath = storage_path('app/public/' . $fullPath);
+            $outputPath = storage_path('app/public/clothing_items/processed');
+
+            $python = base_path('ai/venv/bin/python');
+
+            $bgScript = base_path('ai/bg_remover.py');
+
+            $bgCommand = escapeshellcmd($python) . ' ' .
+                escapeshellarg($bgScript) . ' --file ' .
+                escapeshellarg($inputPath) . ' --output ' .
+                escapeshellarg($outputPath);
+
+            $bgOutput = shell_exec($bgCommand . ' 2>&1');
+
+            \Log::info('BG OUTPUT: ' . $bgOutput);
+
+            $bgResult = self::parsePythonJson($bgOutput);
+
+            if (!$bgResult) {
+                throw new \Exception('Background remover did not return valid JSON: ' . $bgOutput);
+            }
+
+            if (!isset($bgResult['success']) || !$bgResult['success']) {
+                throw new \Exception('Background remover failed: ' . ($bgResult['error'] ?? 'Unknown error'));
+            }
+
             $item->imageNoBg = str_replace(
                 storage_path('app/public/') . '/',
                 '',
-                $result['transparent_path']
+                $bgResult['transparent_path']
             );
 
             $item->save();
+
+            $classifierScript = base_path('ai/fashion_classifier.py');
+
+            $classifyCommand = escapeshellcmd($python) . ' ' .
+                escapeshellarg($classifierScript) . ' --file ' .
+                escapeshellarg($bgResult['transparent_path']);
+
+            $classifyOutput = shell_exec($classifyCommand . ' 2>&1');
+
+            \Log::info('CLASSIFY OUTPUT: ' . $classifyOutput);
+
+            $classifyResult = self::parsePythonJson($classifyOutput);
+
+            if (
+                $classifyResult &&
+                isset($classifyResult['success']) &&
+                $classifyResult['success']
+            ) {
+                $item->category = $classifyResult['category'];
+                $item->save();
+            }
         }
+
+        return $item;
     }
 
-    return $item;
-}
+    public static function deleteClothingItem($id)
+    {
+        $item = ClothingItem::where('userId', auth()->id())
+            ->where('id', $id)
+            ->firstOrFail();
 
-public static function deleteClothingItem($id)
-{
-    $item = ClothingItem::where('userId', auth()->id())
-        ->where('id', $id)
-        ->firstOrFail();
+        $item->delete();
 
-    $item->delete();
-
-    return true;
-}
+        return true;
+    }
 }
