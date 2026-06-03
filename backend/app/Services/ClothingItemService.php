@@ -34,12 +34,19 @@ class ClothingItemService
         return null;
     }
 
+    private static function getPythonPath()
+    {
+        return strtoupper(substr(PHP_OS, 0, 3)) === 'WIN'
+            ? base_path('ai/venv/Scripts/python.exe')
+            : base_path('ai/venv/bin/python');
+    }
+
     public static function createOrUpdateClothingItem($data, $item)
     {
         set_time_limit(300);
 
         $item->userId = $data['userId'] ?? $item->userId;
-        $item->name = $data['name'] ?? $item->name;
+        $item->name = $data['name'] ?? $item->name ?? 'Untitled Item';
         $item->category = $data['category'] ?? $item->category ?? 'uncategorized';
         $item->subcategory = $data['subcategory'] ?? $item->subcategory;
         $item->color = $data['color'] ?? $item->color;
@@ -76,11 +83,11 @@ class ClothingItemService
             $inputPath = storage_path('app/public/' . $fullPath);
             $outputPath = storage_path('app/public/clothing_items/processed');
 
-            $python = base_path('ai/venv/bin/python');
+            $python = self::getPythonPath();
 
             $bgScript = base_path('ai/bg_remover.py');
 
-            $bgCommand = escapeshellcmd($python) . ' ' .
+            $bgCommand = escapeshellarg($python) . ' ' .
                 escapeshellarg($bgScript) . ' --file ' .
                 escapeshellarg($inputPath) . ' --output ' .
                 escapeshellarg($outputPath);
@@ -109,7 +116,7 @@ class ClothingItemService
 
             $classifierScript = base_path('ai/fashion_classifier.py');
 
-            $classifyCommand = escapeshellcmd($python) . ' ' .
+            $classifyCommand = escapeshellarg($python) . ' ' .
                 escapeshellarg($classifierScript) . ' --file ' .
                 escapeshellarg($bgResult['transparent_path']);
 
