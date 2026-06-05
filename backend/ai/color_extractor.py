@@ -8,15 +8,59 @@ BASIC_COLORS = {
     "black": (0, 0, 0),
     "white": (255, 255, 255),
     "gray": (128, 128, 128),
+
+    # neutrals
+    "cream": (255, 253, 208),
+    "ivory": (255, 255, 240),
     "beige": (245, 245, 220),
+    "tan": (210, 180, 140),
+    "camel": (193, 154, 107),
+    "khaki": (195, 176, 145),
+    "taupe": (139, 133, 137),
     "brown": (139, 69, 19),
+
+    # reds
     "red": (255, 0, 0),
+    "burgundy": (128, 0, 32),
+    "maroon": (128, 0, 0),
+
+    # pinks
     "pink": (255, 192, 203),
+    "rose": (255, 102, 204),
+    "dusty_rose": (188, 143, 143),
+
+    # oranges
     "orange": (255, 165, 0),
+    "coral": (255, 127, 80),
+    "peach": (255, 218, 185),
+
+    # yellows
     "yellow": (255, 255, 0),
+    "mustard": (255, 219, 88),
+    "gold": (255, 215, 0),
+
+    # greens
     "green": (0, 128, 0),
+    "olive": (128, 128, 0),
+    "sage": (188, 184, 138),
+    "mint": (152, 255, 152),
+    "emerald": (80, 200, 120),
+
+    # blues
     "blue": (0, 0, 255),
-    "purple": (128, 0, 128)
+    "navy": (0, 0, 128),
+    "sky_blue": (135, 206, 235),
+    "teal": (0, 128, 128),
+    "turquoise": (64, 224, 208),
+
+    # purples
+    "purple": (128, 0, 128),
+    "lavender": (230, 230, 250),
+    "lilac": (200, 162, 200),
+
+    # metallics
+    "silver": (192, 192, 192),
+    "bronze": (205, 127, 50)
 }
 
 def closest_color_name(rgb):
