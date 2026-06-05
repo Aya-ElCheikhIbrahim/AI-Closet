@@ -134,6 +134,28 @@ class ClothingItemService
                 $item->category = $classifyResult['category'];
                 $item->save();
             }
+
+            $colorScript = base_path('ai/color_extractor.py');
+
+            $colorCommand = escapeshellarg($python) . ' ' .
+                escapeshellarg($colorScript) . ' --file ' .
+                escapeshellarg($bgResult['transparent_path']);
+
+            $colorOutput = shell_exec($colorCommand . ' 2>&1');
+
+            \Log::info('COLOR OUTPUT: ' . $colorOutput);
+
+            $colorResult = self::parsePythonJson($colorOutput);
+
+            if (
+                $colorResult &&
+                isset($colorResult['success']) &&
+                $colorResult['success']
+            ) {
+                $item->color = $colorResult['primaryColor'];
+                $item->secondaryColor = $colorResult['secondaryColor'];
+                $item->save();
+            }
         }
 
         return $item;
