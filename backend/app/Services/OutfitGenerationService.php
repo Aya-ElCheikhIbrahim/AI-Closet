@@ -40,9 +40,7 @@ class OutfitGenerationService
 
         foreach ($groups['tops'] as $top) {
             foreach ($groups['bottoms'] as $bottom) {
-                $outfitItems = [$top, $bottom];
-
-                $outfits[] = self::buildOutfit($outfitItems, $filters);
+                $outfits[] = self::buildOutfit([$top, $bottom], $filters);
 
                 foreach ($groups['outerwear'] as $outerwear) {
                     $outfits[] = self::buildOutfit([$top, $bottom, $outerwear], $filters);
@@ -58,9 +56,7 @@ class OutfitGenerationService
             }
         }
 
-        usort($outfits, function ($a, $b) {
-            return $b['score'] <=> $a['score'];
-        });
+        usort($outfits, fn ($a, $b) => $b['score'] <=> $a['score']);
 
         return array_slice($outfits, 0, $filters['limit'] ?? 10);
     }
@@ -77,10 +73,8 @@ class OutfitGenerationService
 
     private static function buildOutfit($items, $filters)
     {
-        $score = self::scoreOutfit($items, $filters);
-
         return [
-            'score' => $score,
+            'score' => self::scoreOutfit($items, $filters),
             'items' => collect($items)->map(function ($item) {
                 return [
                     'id' => $item->id,
@@ -104,10 +98,11 @@ class OutfitGenerationService
     {
         $score = 40;
 
-        if (self::hasGoodColorHarmony($items)) {
-            $score += 25;
-        } else {
-            $score -= 20;
+        $colorScore = self::colorHarmonyScore($items);
+        $score += $colorScore;
+
+        if ($colorScore < 0) {
+            $score -= 10;
         }
 
         if (self::matchesSeason($items, $filters['season'] ?? null)) {
@@ -128,40 +123,75 @@ class OutfitGenerationService
             }
         }
 
-        if (self::hasTooManyBoldColors($items)) {
-            $score -= 10;
+        if (self::hasTooManyBoldPrimaryColors($items)) {
+            $score -= 15;
         }
 
         return max(0, min(100, $score));
     }
 
-    private static function hasGoodColorHarmony($items)
+    private static function colorHarmonyScore($items)
     {
-        $colors = self::extractColors($items);
+        $score = 0;
+        $items = collect($items)->values();
 
-        if (count($colors) <= 1) {
-            return true;
-        }
-
-        $neutralCount = count(array_intersect($colors, self::$neutralColors));
-
-        if ($neutralCount >= 1) {
-            return true;
-        }
-
-        foreach ($colors as $colorA) {
-            foreach ($colors as $colorB) {
-                if ($colorA === $colorB) {
-                    continue;
-                }
-
-                if (self::colorsMatch($colorA, $colorB)) {
-                    return true;
-                }
+        for ($i = 0; $i < count($items); $i++) {
+            for ($j = $i + 1; $j < count($items); $j++) {
+                $score += self::pairColorScore($items[$i], $items[$j]);
             }
         }
 
-        return false;
+        return $score;
+    }
+
+    private static function pairColorScore($itemA, $itemB)
+    {
+        $score = 0;
+
+        $primaryA = $itemA->color;
+        $primaryB = $itemB->color;
+
+        $secondaryA = $itemA->secondaryColor;
+        $secondaryB = $itemB->secondaryColor;
+
+        if (!$primaryA || !$primaryB) {
+            return 0;
+        }
+
+        if ($primaryA === $primaryB) {
+            $score += 20;
+        } elseif (self::colorsMatch($primaryA, $primaryB)) {
+            $score += 18;
+        } elseif (self::isNeutral($primaryA) || self::isNeutral($primaryB)) {
+            $score += 12;
+        } else {
+            $score -= 15;
+        }
+
+        if ($secondaryA) {
+            if ($secondaryA === $primaryB || self::colorsMatch($secondaryA, $primaryB)) {
+                $score += 8;
+            }
+        }
+
+        if ($secondaryB) {
+            if ($secondaryB === $primaryA || self::colorsMatch($secondaryB, $primaryA)) {
+                $score += 8;
+            }
+        }
+
+        if ($secondaryA && $secondaryB) {
+            if ($secondaryA === $secondaryB || self::colorsMatch($secondaryA, $secondaryB)) {
+                $score += 4;
+            }
+        }
+
+        return $score;
+    }
+
+    private static function isNeutral($color)
+    {
+        return in_array($color, self::$neutralColors);
     }
 
     private static function colorsMatch($colorA, $colorB)
@@ -178,18 +208,30 @@ class OutfitGenerationService
             'pink' => ['white', 'cream', 'gray', 'beige', 'black'],
             'purple' => ['white', 'cream', 'gray', 'black'],
             'yellow' => ['white', 'cream', 'gray', 'blue', 'black'],
+            'mustard' => ['cream', 'white', 'brown', 'beige', 'navy'],
             'orange' => ['white', 'cream', 'beige', 'brown'],
+            'gray' => ['black', 'white', 'cream', 'pink', 'burgundy', 'blue'],
+            'cream' => ['black', 'brown', 'camel', 'burgundy', 'red', 'blue', 'navy', 'green', 'olive'],
+            'beige' => ['black', 'brown', 'camel', 'burgundy', 'blue', 'navy', 'green', 'olive'],
+            'white' => ['black', 'brown', 'camel', 'burgundy', 'red', 'blue', 'navy', 'green', 'pink', 'purple'],
+            'black' => ['white', 'cream', 'beige', 'gray', 'brown', 'camel', 'burgundy', 'red', 'pink', 'blue', 'green', 'purple'],
         ];
 
         return in_array($colorB, $matches[$colorA] ?? [])
             || in_array($colorA, $matches[$colorB] ?? []);
     }
 
-    private static function hasTooManyBoldColors($items)
+    private static function hasTooManyBoldPrimaryColors($items)
     {
-        $colors = self::extractColors($items);
+        $primaryColors = [];
 
-        $boldCount = count(array_intersect($colors, self::$boldColors));
+        foreach ($items as $item) {
+            if ($item->color) {
+                $primaryColors[] = $item->color;
+            }
+        }
+
+        $boldCount = count(array_intersect($primaryColors, self::$boldColors));
 
         return $boldCount >= 3;
     }
@@ -243,14 +285,19 @@ class OutfitGenerationService
 
     private static function generateReason($items)
     {
-        $colors = self::extractColors($items);
+        $items = collect($items)->values();
 
-        if (count($colors) >= 2) {
-            return ucfirst($colors[0]) . ' and ' . $colors[1] . ' create a balanced outfit.';
+        if (count($items) >= 2) {
+            $first = $items[0];
+            $second = $items[1];
+
+            return ucfirst($first->color) . ' ' . $first->category .
+                ' pairs well with ' . $second->color . ' ' . $second->category .
+                ' because the primary colors work together, while the secondary colors add balance.';
         }
 
-        if (count($colors) === 1) {
-            return ucfirst($colors[0]) . ' creates a clean, cohesive look.';
+        if (count($items) === 1) {
+            return ucfirst($items[0]->color) . ' creates a clean, cohesive look.';
         }
 
         return 'This outfit has a balanced structure and works well together.';
