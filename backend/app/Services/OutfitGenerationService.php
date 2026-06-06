@@ -3,24 +3,14 @@
 namespace App\Services;
 
 use App\Models\ClothingItem;
+use Carbon\Carbon;
 
 class OutfitGenerationService
 {
-    private static array $tops = [
-        't-shirt', 'shirt', 'blouse', 'hoodie', 'sweater'
-    ];
-
-    private static array $bottoms = [
-        'jeans', 'pants', 'skirt', 'shorts'
-    ];
-
-    private static array $dresses = [
-        'dress'
-    ];
-
-    private static array $outerwear = [
-        'jacket', 'coat'
-    ];
+    private static array $tops = ['t-shirt', 'shirt', 'blouse', 'hoodie', 'sweater'];
+    private static array $bottoms = ['jeans', 'pants', 'skirt', 'shorts'];
+    private static array $dresses = ['dress'];
+    private static array $outerwear = ['jacket', 'coat'];
 
     private static array $neutralColors = [
         'black', 'white', 'cream', 'beige', 'gray', 'camel'
@@ -56,9 +46,11 @@ class OutfitGenerationService
             }
         }
 
+        $outfits = array_filter($outfits, fn ($outfit) => $outfit['score'] >= 45);
+
         usort($outfits, fn ($a, $b) => $b['score'] <=> $a['score']);
 
-        return array_slice($outfits, 0, $filters['limit'] ?? 10);
+        return array_slice(array_values($outfits), 0, $filters['limit'] ?? 10);
     }
 
     private static function groupItemsByCategory($items)
@@ -96,38 +88,47 @@ class OutfitGenerationService
 
     private static function scoreOutfit($items, $filters)
     {
-        $score = 40;
+        $score = 50;
 
-        $colorScore = self::colorHarmonyScore($items);
-        $score += $colorScore;
-
-        if ($colorScore < 0) {
-            $score -= 10;
-        }
-
-        if (self::matchesSeason($items, $filters['season'] ?? null)) {
-            $score += 15;
-        }
-
-        if (self::matchesOccasion($items, $filters['occasion'] ?? null)) {
-            $score += 15;
-        }
-
-        foreach ($items as $item) {
-            if ($item->favorite) {
-                $score += 5;
-            }
-
-            if (($item->wearCount ?? 0) === 0) {
-                $score += 3;
-            }
-        }
+        $score += self::colorHarmonyScore($items);
+        $score += self::structureScore($items);
+        $score += self::seasonScore($items, $filters['season'] ?? null);
+        $score += self::occasionScore($items, $filters['occasion'] ?? null);
+        $score += self::usageScore($items);
 
         if (self::hasTooManyBoldPrimaryColors($items)) {
-            $score -= 15;
+            $score -= 18;
         }
 
-        return max(0, min(100, $score));
+        return max(0, min(100, round($score)));
+    }
+
+    private static function structureScore($items)
+    {
+        $categories = collect($items)->pluck('category')->toArray();
+
+        $hasTop = count(array_intersect($categories, self::$tops)) > 0;
+        $hasBottom = count(array_intersect($categories, self::$bottoms)) > 0;
+        $hasDress = count(array_intersect($categories, self::$dresses)) > 0;
+        $hasOuterwear = count(array_intersect($categories, self::$outerwear)) > 0;
+
+        if ($hasTop && $hasBottom && $hasOuterwear) {
+            return 8;
+        }
+
+        if ($hasTop && $hasBottom) {
+            return 5;
+        }
+
+        if ($hasDress && $hasOuterwear) {
+            return 6;
+        }
+
+        if ($hasDress) {
+            return 3;
+        }
+
+        return -10;
     }
 
     private static function colorHarmonyScore($items)
@@ -141,7 +142,7 @@ class OutfitGenerationService
             }
         }
 
-        return $score;
+        return min(25, max(-25, $score));
     }
 
     private static function pairColorScore($itemA, $itemB)
@@ -150,7 +151,6 @@ class OutfitGenerationService
 
         $primaryA = $itemA->color;
         $primaryB = $itemB->color;
-
         $secondaryA = $itemA->secondaryColor;
         $secondaryB = $itemB->secondaryColor;
 
@@ -159,30 +159,119 @@ class OutfitGenerationService
         }
 
         if ($primaryA === $primaryB) {
-            $score += 20;
+            $score += 10;
         } elseif (self::colorsMatch($primaryA, $primaryB)) {
-            $score += 18;
+            $score += 9;
         } elseif (self::isNeutral($primaryA) || self::isNeutral($primaryB)) {
-            $score += 12;
+            $score += 6;
         } else {
-            $score -= 15;
+            $score -= 10;
         }
 
-        if ($secondaryA) {
-            if ($secondaryA === $primaryB || self::colorsMatch($secondaryA, $primaryB)) {
-                $score += 8;
+        if ($secondaryA && ($secondaryA === $primaryB || self::colorsMatch($secondaryA, $primaryB))) {
+            $score += 3;
+        }
+
+        if ($secondaryB && ($secondaryB === $primaryA || self::colorsMatch($secondaryB, $primaryA))) {
+            $score += 3;
+        }
+
+        if ($secondaryA && $secondaryB && ($secondaryA === $secondaryB || self::colorsMatch($secondaryA, $secondaryB))) {
+            $score += 2;
+        }
+
+        return $score;
+    }
+
+    private static function seasonScore($items, $requestedSeason)
+    {
+        $score = 0;
+
+        foreach ($items as $item) {
+            if (!$item->season || $item->season === 'all') {
+                continue;
+            }
+
+            if ($requestedSeason) {
+                $score += $item->season === $requestedSeason ? 4 : -8;
             }
         }
 
-        if ($secondaryB) {
-            if ($secondaryB === $primaryA || self::colorsMatch($secondaryB, $primaryA)) {
-                $score += 8;
+        if (!$requestedSeason) {
+            $seasons = collect($items)
+                ->pluck('season')
+                ->filter(fn ($season) => $season && $season !== 'all')
+                ->unique()
+                ->values();
+
+            if ($seasons->count() > 1) {
+                $score -= 6;
             }
         }
 
-        if ($secondaryA && $secondaryB) {
-            if ($secondaryA === $secondaryB || self::colorsMatch($secondaryA, $secondaryB)) {
-                $score += 4;
+        return $score;
+    }
+
+    private static function occasionScore($items, $requestedOccasion)
+    {
+        $score = 0;
+
+        foreach ($items as $item) {
+            if (!$item->occasion || $item->occasion === 'all') {
+                continue;
+            }
+
+            if ($requestedOccasion) {
+                $score += $item->occasion === $requestedOccasion ? 4 : -10;
+            }
+        }
+
+        if (!$requestedOccasion) {
+            $occasions = collect($items)
+                ->pluck('occasion')
+                ->filter(fn ($occasion) => $occasion && $occasion !== 'all')
+                ->unique()
+                ->values();
+
+            if ($occasions->count() > 1) {
+                $score -= 8;
+            }
+        }
+
+        return $score;
+    }
+
+    private static function usageScore($items)
+    {
+        $score = 0;
+
+        foreach ($items as $item) {
+            $wearCount = $item->wearCount ?? 0;
+
+            if ($item->favorite) {
+                $score += 3;
+            }
+
+            if ($wearCount === 0) {
+                $score += 5;
+            } elseif ($wearCount <= 3) {
+                $score += 2;
+            } elseif ($wearCount > 20) {
+                $score -= 12;
+            } elseif ($wearCount > 10) {
+                $score -= 7;
+            } elseif ($wearCount > 5) {
+                $score -= 3;
+            }
+
+            if ($item->lastWornAt) {
+                $lastWorn = Carbon::parse($item->lastWornAt);
+
+                if ($lastWorn->greaterThanOrEqualTo(now()->subDays(3))) {
+                    $score -= 8;
+                } elseif ($lastWorn->greaterThanOrEqualTo(now()->subDays(7))) {
+                    $score -= 4;
+                }
             }
         }
 
@@ -231,72 +320,23 @@ class OutfitGenerationService
             }
         }
 
-        $boldCount = count(array_intersect($primaryColors, self::$boldColors));
-
-        return $boldCount >= 3;
-    }
-
-    private static function extractColors($items)
-    {
-        $colors = [];
-
-        foreach ($items as $item) {
-            if ($item->color) {
-                $colors[] = $item->color;
-            }
-
-            if ($item->secondaryColor) {
-                $colors[] = $item->secondaryColor;
-            }
-        }
-
-        return array_values(array_unique($colors));
-    }
-
-    private static function matchesSeason($items, $season)
-    {
-        if (!$season) {
-            return true;
-        }
-
-        foreach ($items as $item) {
-            if ($item->season && $item->season !== $season && $item->season !== 'all') {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function matchesOccasion($items, $occasion)
-    {
-        if (!$occasion) {
-            return true;
-        }
-
-        foreach ($items as $item) {
-            if ($item->occasion && $item->occasion !== $occasion && $item->occasion !== 'all') {
-                return false;
-            }
-        }
-
-        return true;
+        return count(array_intersect($primaryColors, self::$boldColors)) >= 3;
     }
 
     private static function generateReason($items)
     {
         $items = collect($items)->values();
 
-        if (count($items) >= 2) {
+        if ($items->count() >= 2) {
             $first = $items[0];
             $second = $items[1];
 
             return ucfirst($first->color) . ' ' . $first->category .
                 ' pairs well with ' . $second->color . ' ' . $second->category .
-                ' because the primary colors work together, while the secondary colors add balance.';
+                ' because the primary colors are compatible and the secondary tones add balance.';
         }
 
-        if (count($items) === 1) {
+        if ($items->count() === 1) {
             return ucfirst($items[0]->color) . ' creates a clean, cohesive look.';
         }
 
