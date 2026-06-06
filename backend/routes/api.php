@@ -8,6 +8,7 @@ use App\Http\Controllers\ClothingTagController;
 use App\Http\Controllers\TagController;
 use Illuminate\Support\Facades\Route;
 
+
 Route::post('/register', [AuthController::class, 'register']); //working
 Route::post('/login', [AuthController::class, 'login']); //working
  
@@ -39,4 +40,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/add_update_clothing_tag/{id?}',   [ClothingTagController::class, 'createOrUpdateClothingTag']);
     Route::delete('/delete_clothing_tags/{id?}', [ClothingTagController::class, 'deleteClothingTag']);
     //ai generation GET POST DELETE 
+
+    Route::get('/generate_outfits',[OutfitController::class, 'generateOutfits']);
 });

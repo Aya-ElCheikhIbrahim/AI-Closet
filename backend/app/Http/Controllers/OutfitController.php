@@ -7,6 +7,7 @@ use App\Services\OutfitService;
 use App\Traits\ResponseTrait;
 use Exception;
 use Illuminate\Http\Request;
+use App\Services\OutfitGenerationService;
 
 class OutfitController extends Controller
 {
@@ -65,5 +66,30 @@ class OutfitController extends Controller
         } catch (Exception $e) {
             return $this->responseJSON(null, $e->getMessage(), 500);
         }
+ 
+        }
+        public function generateOutfits(Request $request)
+{
+    try {
+        $outfits = OutfitGenerationService::generateOutfits(
+            auth()->id(),
+            [
+                'season' => $request->season,
+                'occasion' => $request->occasion,
+                'limit' => $request->limit ?? 10,
+            ]
+        );
+
+        return $this->responseJSON(
+            $outfits,
+            "Outfits generated successfully."
+        );
+    } catch (Exception $e) {
+        return $this->responseJSON(
+            null,
+            $e->getMessage(),
+            500
+        );
     }
+}
 }
