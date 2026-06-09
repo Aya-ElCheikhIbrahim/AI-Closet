@@ -42,4 +42,6 @@ Route::middleware('auth:sanctum')->group(function () {
     //ai generation GET POST DELETE 
 
     Route::get('/generate_outfits',[OutfitController::class, 'generateOutfits']);
+
+    Route::post('/generate_ai_outfit_image', [OutfitController::class, 'generateAiOutfitImage']);
 });

@@ -8,6 +8,7 @@ use App\Traits\ResponseTrait;
 use Exception;
 use Illuminate\Http\Request;
 use App\Services\OutfitGenerationService;
+use App\Services\AiOutfitImageService;
 
 class OutfitController extends Controller
 {
@@ -90,6 +91,35 @@ class OutfitController extends Controller
             $e->getMessage(),
             500
         );
+    }
+}
+public function generateAiOutfitImage(Request $request)
+{
+    try {
+        $outfits = OutfitGenerationService::generateOutfits(
+            auth()->id(),
+            [
+                'season' => $request->season,
+                'occasion' => $request->occasion,
+                'limit' => 1,
+            ]
+        );
+
+        if (empty($outfits)) {
+            return $this->responseJSON(null, "No outfit could be generated.", 404);
+        }
+
+        $itemIds = collect($outfits[0]['items'])->pluck('id')->toArray();
+
+        $items = \App\Models\ClothingItem::where('userId', auth()->id())
+            ->whereIn('id', $itemIds)
+            ->get();
+
+        $result = AiOutfitImageService::generateOutfitImage($items);
+
+        return $this->responseJSON($result, "AI outfit image generated successfully.");
+    } catch (Exception $e) {
+        return $this->responseJSON(null, $e->getMessage(), 500);
     }
 }
 }
